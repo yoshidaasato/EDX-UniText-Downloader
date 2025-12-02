@@ -1,28 +1,31 @@
 import os
 import requests
 import re
+import dotenv
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF
 from PyPDF2 import PdfMerger
 
+dotenv.load_env()
+
 # ================= SETTING =================
 # 1. ベースとなるURL (数字の部分を {} に置き換えてください)
 # 例: .../pages/1/page.svg -> .../pages/{}/page.svg
-BASE_URL = ""
+BASE_URL = os.getenv("EDX_BASE_URL", "")
 # 2. 出力PDFファイル名
-output_name = "hoge.pdf"
+output_name = os.getenv("OUTPUT_NAME", "output.pdf")
 
-# 3. ブラウザから取得した Cookie と User-Agent を貼り付けてください
+# 3. ヘッダー情報 (Cookie等)
 HEADERS = {
-    "Cookie": "",
-    "User-Agent": ""
+    "Cookie": os.getenv("COOKIE", ""),
+    "User-Agent": os.getenv("USER_AGENT", "")
 }
 # ===========================================
 
 def download_and_convert():
     merger = PdfMerger()
-    temp_files = [] 
-    
+    temp_files = []
+
     if not os.path.exists("images"):
         os.makedirs("images")
 
@@ -38,21 +41,21 @@ def download_and_convert():
         try:
             # --- 1. アクセス確認 ---
             response = requests.get(url, headers=HEADERS)
-            
+
             # ステータスコードが200(成功)以外なら終了とみなす
             if response.status_code != 200:
                 print(f"-> ページがありません (Status: {response.status_code})。終了処理に入ります。")
                 break
-            
+
             print("OK! ダウンロード処理中")
 
             # --- 2. SVG本体処理 ---
             svg_content = response.text
-            page_base_url = url.rsplit('/', 1)[0] 
-            
+            page_base_url = url.rsplit('/', 1)[0]
+
             # --- 3. 画像(JPG等)の自動収集 ---
             linked_images = set(re.findall(r'["\'](images/[^"\']+)["\']', svg_content))
-            
+
             for img_path in linked_images:
                 img_url = f"{page_base_url}/{img_path}"
                 local_img_path = img_path.replace("/", os.sep)
@@ -74,10 +77,10 @@ def download_and_convert():
             renderPDF.drawToFile(drawing, pdf_filename)
 
             merger.append(pdf_filename)
-            
+
             temp_files.append(svg_filename)
             temp_files.append(pdf_filename)
-            
+
             # 次のページへ
             page_num += 1
 
